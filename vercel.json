@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/published-projects/[publicId]/events/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
