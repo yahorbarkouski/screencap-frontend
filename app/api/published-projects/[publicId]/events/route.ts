@@ -120,6 +120,7 @@ export async function POST(
     const blob = await put(blobPath, file, {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
 
     const event = await upsertEvent({
