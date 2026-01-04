@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-// @ts-ignore
 import { AsciiEffect } from "three/examples/jsm/effects/AsciiEffect.js";
 
 export function ParticleBackground() {

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Radio } from "lucide-react";
 import { PublicProgressTimelineGroup } from "./PublicProgressTimelineGroup";
 import { groupByDate, rangeBounds, type RangePreset } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import type { PublicEventResponse, PublicProjectResponse } from "@/lib/db/types";
+import type { PublicDecryptedEvent } from "./types";
 
 const POLL_INTERVAL = 8000;
 
@@ -15,17 +16,122 @@ interface PublicProgressViewProps {
   initialEvents: PublicEventResponse[];
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buf = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buf).set(bytes);
+  return buf;
+}
+
 export function PublicProgressView({
   project,
   initialEvents,
 }: PublicProgressViewProps) {
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [events, setEvents] = useState<PublicEventResponse[]>(initialEvents);
+  const [decryptedEvents, setDecryptedEvents] = useState<PublicDecryptedEvent[]>([]);
+  const [roomKey, setRoomKey] = useState<Uint8Array | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLive, setIsLive] = useState(true);
-  const [lastPolled, setLastPolled] = useState<number>(Date.now());
+  const imageUrlCache = useRef<Map<string, string>>(new Map());
+
+  const decodeBase64 = useCallback((b64: string): Uint8Array => {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }, []);
+
+  const decodeBase64Url = useCallback(
+    (b64url: string): Uint8Array => {
+      const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+      return decodeBase64(`${b64}${pad}`);
+    },
+    [decodeBase64]
+  );
+
+  const parseRoomKeyFromHash = useCallback((): Uint8Array | null => {
+    const hash = window.location.hash.startsWith("#")
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const params = new URLSearchParams(hash.startsWith("k=") ? hash : hash.replace(/^#/, ""));
+    const k = params.get("k");
+    if (!k) return null;
+    try {
+      const bytes = decodeBase64Url(k);
+      return bytes.length === 32 ? bytes : null;
+    } catch {
+      return null;
+    }
+  }, [decodeBase64Url]);
+
+  const deriveAesKey = useCallback(async (info: string) => {
+    if (!roomKey) throw new Error("Missing room key");
+    const ikm = await crypto.subtle.importKey("raw", toArrayBuffer(roomKey), "HKDF", false, [
+      "deriveBits",
+    ]);
+    const bits = await crypto.subtle.deriveBits(
+      {
+        name: "HKDF",
+        hash: "SHA-256",
+        salt: new Uint8Array(),
+        info: new TextEncoder().encode(info),
+      },
+      ikm,
+      256
+    );
+    return await crypto.subtle.importKey(
+      "raw",
+      bits,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+  }, [roomKey]);
+
+  const decryptAesGcm = useCallback(
+    async (key: CryptoKey, ciphertextB64: string): Promise<Uint8Array> => {
+      const data = decodeBase64(ciphertextB64);
+      if (data.length < 12 + 16) throw new Error("Ciphertext too short");
+      const nonce = data.slice(0, 12);
+      const cipherWithTag = data.slice(12);
+      const plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce },
+        key,
+        cipherWithTag
+      );
+      return new Uint8Array(plaintext);
+    },
+    [decodeBase64]
+  );
+
+  const decryptImageToObjectUrl = useCallback(
+    async (key: CryptoKey, imageUrl: string, mime: string): Promise<string> => {
+      const res = await fetch(imageUrl);
+      if (!res.ok) throw new Error("Image fetch failed");
+      const data = new Uint8Array(await res.arrayBuffer());
+      if (data.length < 12 + 16) throw new Error("Ciphertext too short");
+      const nonce = data.slice(0, 12);
+      const cipherWithTag = data.slice(12);
+      const plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce },
+        key,
+        cipherWithTag
+      );
+      return URL.createObjectURL(new Blob([plaintext], { type: mime }));
+    },
+    []
+  );
+
+  useEffect(() => {
+    const update = () => setRoomKey(parseRoomKeyFromHash());
+    update();
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, [parseRoomKeyFromHash]);
 
   const fetchEvents = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await fetch(
         `/api/published-projects/${project.id}/events?limit=100`
@@ -33,9 +139,10 @@ export function PublicProgressView({
       if (!response.ok) return;
       const data: PublicEventResponse[] = await response.json();
       setEvents(data);
-      setLastPolled(Date.now());
     } catch (error) {
       console.error("Failed to fetch events:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [project.id]);
 
@@ -61,11 +168,74 @@ export function PublicProgressView({
           );
         });
       }
-      setLastPolled(Date.now());
     } catch (error) {
       console.error("Failed to fetch new events:", error);
     }
   }, [events, fetchEvents, project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!roomKey) {
+        setDecryptedEvents([]);
+        return;
+      }
+
+      const eventKey = await deriveAesKey("room-event");
+      const imageKey = await deriveAesKey("room-image");
+
+      const base = await Promise.all(
+        events.map(async (e) => {
+          const payloadBytes = await decryptAesGcm(eventKey, e.payloadCiphertext);
+          const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as {
+            caption?: string | null;
+            image?: { ref?: string | null; mime?: string | null };
+          };
+
+          const caption =
+            typeof payload?.caption === "string" ? payload.caption : null;
+          const imageRef =
+            typeof payload?.image?.ref === "string" ? payload.image.ref : e.imageUrl;
+          const mime =
+            typeof payload?.image?.mime === "string" && payload.image.mime
+              ? payload.image.mime
+              : "image/webp";
+
+          const cached = imageUrlCache.current.get(e.id) ?? null;
+          return { id: e.id, timestampMs: e.timestampMs, caption, imageRef, mime, cached };
+        })
+      );
+
+      if (cancelled) return;
+      setDecryptedEvents(
+        base.map((e) => ({
+          id: e.id,
+          timestampMs: e.timestampMs,
+          caption: e.caption,
+          imageUrl: e.cached,
+        }))
+      );
+
+      for (const e of base) {
+        if (!e.imageRef) continue;
+        if (imageUrlCache.current.has(e.id)) continue;
+        try {
+          const objectUrl = await decryptImageToObjectUrl(imageKey, e.imageRef, e.mime);
+          if (cancelled) return;
+          imageUrlCache.current.set(e.id, objectUrl);
+          setDecryptedEvents((prev) =>
+            prev.map((p) => (p.id === e.id ? { ...p, imageUrl: objectUrl } : p))
+          );
+        } catch {}
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [decryptAesGcm, decryptImageToObjectUrl, deriveAesKey, events, roomKey]);
 
   useEffect(() => {
     if (!isLive) return;
@@ -75,23 +245,37 @@ export function PublicProgressView({
   }, [fetchNewEvents, isLive]);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchEvents().finally(() => setIsLoading(false));
-  }, [preset, fetchEvents]);
+    void fetchEvents();
+  }, [fetchEvents]);
 
   const filteredEvents = useMemo(() => {
     const { startDate, endDate } = rangeBounds(preset);
-    return events.filter((e) => {
+    return decryptedEvents.filter((e) => {
       if (startDate && e.timestampMs < startDate) return false;
       if (endDate && e.timestampMs > endDate) return false;
       return true;
     });
-  }, [events, preset]);
+  }, [decryptedEvents, preset]);
 
   const groupedEvents = useMemo(
     () => groupByDate(filteredEvents),
     [filteredEvents]
   );
+
+  if (!roomKey) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+        <div className="rounded-lg border border-border bg-muted/10 p-4">
+          <div className="text-sm font-medium text-foreground">
+            This share link is encrypted
+          </div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            Open the link that includes the decryption key in the URL fragment.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

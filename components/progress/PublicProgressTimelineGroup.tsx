@@ -2,11 +2,11 @@
 
 import { useMemo } from "react";
 import { PublicProgressCard } from "./PublicProgressCard";
-import type { PublicEventResponse } from "@/lib/db/types";
+import type { PublicDecryptedEvent } from "./types";
 
 interface PublicProgressTimelineGroupProps {
   date: string;
-  events: PublicEventResponse[];
+  events: PublicDecryptedEvent[];
 }
 
 export function PublicProgressTimelineGroup({

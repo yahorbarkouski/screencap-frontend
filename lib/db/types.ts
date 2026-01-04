@@ -31,6 +31,6 @@ export interface PublicProjectResponse {
 export interface PublicEventResponse {
   id: string;
   timestampMs: number;
-  caption: string | null;
-  imageUrl: string;
+  payloadCiphertext: string;
+  imageUrl: string | null;
 }

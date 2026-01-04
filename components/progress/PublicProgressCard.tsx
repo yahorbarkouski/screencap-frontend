@@ -4,10 +4,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { formatTime } from "@/lib/utils/date";
-import type { PublicEventResponse } from "@/lib/db/types";
+import type { PublicDecryptedEvent } from "./types";
 
 interface PublicProgressCardProps {
-  event: PublicEventResponse;
+  event: PublicDecryptedEvent;
   isLast?: boolean;
 }
 
@@ -30,15 +30,22 @@ export function PublicProgressCard({ event, isLast = false }: PublicProgressCard
         <button
           type="button"
           onClick={() => setIsOpen(true)}
+          disabled={!event.imageUrl}
           className="group relative overflow-hidden rounded-xl border border-border bg-card text-left cursor-pointer hover:border-gold/40 transition-colors"
         >
           <div className="relative aspect-video bg-muted">
-            <img
-              src={event.imageUrl}
-              alt={event.caption || "Progress screenshot"}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
+            {event.imageUrl ? (
+              <img
+                src={event.imageUrl}
+                alt={event.caption || "Progress screenshot"}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                Loading…
+              </div>
+            )}
 
             {event.caption && (
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
@@ -86,11 +93,13 @@ export function PublicProgressCard({ event, isLast = false }: PublicProgressCard
                 </button>
               </div>
               <div className="p-2">
-                <img
-                  src={event.imageUrl}
-                  alt={event.caption || "Progress screenshot"}
-                  className="w-full h-auto rounded-lg"
-                />
+                {event.imageUrl ? (
+                  <img
+                    src={event.imageUrl}
+                    alt={event.caption || "Progress screenshot"}
+                    className="w-full h-auto rounded-lg"
+                  />
+                ) : null}
               </div>
               {event.caption && (
                 <div className="border-t border-border p-4">

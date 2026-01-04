@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
-import { getProjectById, getEventsByProject } from "@/lib/db/queries";
+import { getProjectById } from "@/lib/db/queries";
 import { PublicProgressView } from "@/components/progress/PublicProgressView";
 import type { PublicProjectResponse, PublicEventResponse } from "@/lib/db/types";
 import type { Metadata } from "next";
+import { listRoomEvents } from "@/lib/db/roomEvents";
 
 type PageProps = {
   params: Promise<{ publicId: string }>;
@@ -37,7 +38,7 @@ export default async function PublicProgressPage({ params }: PageProps) {
       notFound();
     }
 
-    events = await getEventsByProject(publicId, { limit: 100 });
+    events = await listRoomEvents({ roomId: publicId, limit: 100 });
   } catch (error) {
     console.error("Failed to load project:", error);
     notFound();
@@ -53,9 +54,9 @@ export default async function PublicProgressPage({ params }: PageProps) {
 
   const eventsResponse: PublicEventResponse[] = events.map((e) => ({
     id: e.id,
-    timestampMs: Number(e.timestamp_ms),
-    caption: e.caption,
-    imageUrl: e.image_url,
+    timestampMs: e.timestampMs,
+    payloadCiphertext: e.payloadCiphertext,
+    imageUrl: e.imageRef,
   }));
 
   return (
