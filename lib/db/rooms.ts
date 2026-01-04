@@ -289,3 +289,30 @@ export async function isUserInvitedToRoom(params: {
   return (result.rows[0]?.ok ?? 0) === 1;
 }
 
+export type RoomMemberView = {
+  userId: string;
+  username: string;
+  role: RoomRole;
+};
+
+export async function listRoomMembers(params: {
+  roomId: string;
+}): Promise<RoomMemberView[]> {
+  const result = await sql<{
+    user_id: string;
+    username: string;
+    role: string;
+  }>`
+    SELECT rm.user_id, u.username, rm.role
+    FROM room_members rm
+    JOIN users u ON u.id = rm.user_id
+    WHERE rm.room_id = ${params.roomId}
+    ORDER BY rm.role ASC, u.username ASC
+  `;
+
+  return result.rows.map((r) => ({
+    userId: r.user_id,
+    username: r.username,
+    role: r.role as RoomRole,
+  }));
+}
