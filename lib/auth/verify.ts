@@ -73,7 +73,8 @@ export async function verifySignedRequest(
 
   const bodyBytes = new Uint8Array(await request.clone().arrayBuffer());
   const bodyHashHex = sha256Hex(bodyBytes);
-  const path = request.nextUrl.pathname;
+  const pathWithQuery = request.nextUrl.pathname + request.nextUrl.search;
+  const pathNoQuery = request.nextUrl.pathname;
 
   const deviceKeyB64 = await loadDeviceSigningKey({ userId, deviceId });
   if (!deviceKeyB64) {
@@ -91,14 +92,27 @@ export async function verifySignedRequest(
     throw new SignedRequestError(500, "Invalid device signing key");
   }
 
-  const canonical = canonicalString({
+  const canonicalWithQuery = canonicalString({
     method: request.method,
-    path,
+    path: pathWithQuery,
+    ts: tsRaw,
+    bodyHashHex,
+  });
+  const canonicalNoQuery = canonicalString({
+    method: request.method,
+    path: pathNoQuery,
     ts: tsRaw,
     bodyHashHex,
   });
 
-  const ok = verify(null, Buffer.from(canonical, "utf8"), publicKey, signature);
+  const ok =
+    verify(
+      null,
+      Buffer.from(canonicalWithQuery, "utf8"),
+      publicKey,
+      signature
+    ) ||
+    verify(null, Buffer.from(canonicalNoQuery, "utf8"), publicKey, signature);
   if (!ok) {
     throw new SignedRequestError(403, "Invalid signature");
   }
