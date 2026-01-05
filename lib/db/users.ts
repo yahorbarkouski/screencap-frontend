@@ -1,17 +1,38 @@
 import { sql } from "@vercel/postgres";
 
 export type AvatarPattern =
-  | "letter"
-  | "letterBold"
-  | "letterMonospace"
-  | "pixelLetter"
   | "ascii";
 
 export type AvatarSettings = {
   pattern: AvatarPattern;
   backgroundColor: string;
   foregroundColor: string;
+  asciiChar?: string;
 };
+
+function normalizeAvatarSettings(value: unknown): AvatarSettings | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+
+  const backgroundColor =
+    typeof obj.backgroundColor === "string" ? obj.backgroundColor : null;
+  const foregroundColor =
+    typeof obj.foregroundColor === "string" ? obj.foregroundColor : null;
+  if (!backgroundColor || !foregroundColor) return null;
+
+  const asciiChar =
+    typeof obj.asciiChar === "string" && /^[\x21-\x7E]$/.test(obj.asciiChar)
+      ? obj.asciiChar
+      : undefined;
+
+  // Always normalize to ASCII-only.
+  return {
+    pattern: "ascii",
+    backgroundColor,
+    foregroundColor,
+    ...(asciiChar ? { asciiChar } : {}),
+  };
+}
 
 export type DbUser = {
   id: string;
@@ -35,7 +56,12 @@ export async function getUserById(userId: string): Promise<DbUser | null> {
     FROM users
     WHERE id = ${userId}
   `;
-  return result.rows[0] ?? null;
+  const row = result.rows[0] ?? null;
+  if (!row) return null;
+  return {
+    ...row,
+    avatar_settings: normalizeAvatarSettings(row.avatar_settings),
+  };
 }
 
 export async function getUserByUsername(
@@ -46,7 +72,12 @@ export async function getUserByUsername(
     FROM users
     WHERE username = ${username}
   `;
-  return result.rows[0] ?? null;
+  const row = result.rows[0] ?? null;
+  if (!row) return null;
+  return {
+    ...row,
+    avatar_settings: normalizeAvatarSettings(row.avatar_settings),
+  };
 }
 
 export async function createUserWithDevice(params: {
@@ -102,9 +133,15 @@ export async function updateUserAvatarSettings(params: {
   userId: string;
   avatarSettings: AvatarSettings;
 }): Promise<DbUser> {
+  const normalized: AvatarSettings = {
+    pattern: "ascii",
+    backgroundColor: params.avatarSettings.backgroundColor,
+    foregroundColor: params.avatarSettings.foregroundColor,
+    ...(params.avatarSettings.asciiChar ? { asciiChar: params.avatarSettings.asciiChar } : {}),
+  };
   const result = await sql<DbUser>`
     UPDATE users
-    SET avatar_settings = ${JSON.stringify(params.avatarSettings)}::jsonb
+    SET avatar_settings = ${JSON.stringify(normalized)}::jsonb
     WHERE id = ${params.userId}
     RETURNING id, username, avatar_settings, created_at
   `;
@@ -112,5 +149,8 @@ export async function updateUserAvatarSettings(params: {
   if (!row) {
     throw new Error("User not found");
   }
-  return row;
+  return {
+    ...row,
+    avatar_settings: normalizeAvatarSettings(row.avatar_settings),
+  };
 }

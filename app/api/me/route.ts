@@ -36,18 +36,21 @@ export async function GET(request: NextRequest) {
   });
 }
 
-const VALID_PATTERNS = ["letter", "letterBold", "letterMonospace", "pixelLetter", "ascii"];
+const VALID_PATTERNS = ["ascii"];
 
 function isValidAvatarSettings(value: unknown): value is AvatarSettings {
   if (!value || typeof value !== "object") return false;
   const obj = value as Record<string, unknown>;
+  const asciiChar = obj.asciiChar;
   return (
     typeof obj.pattern === "string" &&
     VALID_PATTERNS.includes(obj.pattern) &&
     typeof obj.backgroundColor === "string" &&
     /^#[0-9a-fA-F]{6}$/.test(obj.backgroundColor) &&
     typeof obj.foregroundColor === "string" &&
-    /^#[0-9a-fA-F]{6}$/.test(obj.foregroundColor)
+    /^#[0-9a-fA-F]{6}$/.test(obj.foregroundColor) &&
+    (asciiChar === undefined ||
+      (typeof asciiChar === "string" && /^[\x21-\x7E]$/.test(asciiChar)))
   );
 }
 

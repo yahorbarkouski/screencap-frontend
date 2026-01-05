@@ -23,10 +23,33 @@ export type FriendRequestView = {
 };
 
 export type AvatarSettings = {
-  pattern: string;
+  pattern: "ascii";
   backgroundColor: string;
   foregroundColor: string;
+  asciiChar?: string;
 } | null;
+
+function normalizeAvatarSettings(value: unknown): AvatarSettings {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  const backgroundColor =
+    typeof obj.backgroundColor === "string" ? obj.backgroundColor : null;
+  const foregroundColor =
+    typeof obj.foregroundColor === "string" ? obj.foregroundColor : null;
+  if (!backgroundColor || !foregroundColor) return null;
+
+  const asciiChar =
+    typeof obj.asciiChar === "string" && /^[\x21-\x7E]$/.test(obj.asciiChar)
+      ? obj.asciiChar
+      : undefined;
+
+  return {
+    pattern: "ascii",
+    backgroundColor,
+    foregroundColor,
+    ...(asciiChar ? { asciiChar } : {}),
+  };
+}
 
 export type FriendView = {
   userId: string;
@@ -210,7 +233,7 @@ export async function listFriends(userId: string): Promise<FriendView[]> {
     username: r.username,
     deviceId: r.device_id,
     dhPubKey: r.dh_pub_key,
-    avatarSettings: r.avatar_settings,
+    avatarSettings: normalizeAvatarSettings(r.avatar_settings),
     createdAt: r.created_at.getTime(),
   }));
 }
