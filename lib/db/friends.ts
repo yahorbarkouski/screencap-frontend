@@ -22,11 +22,18 @@ export type FriendRequestView = {
   respondedAt: number | null;
 };
 
+export type AvatarSettings = {
+  pattern: string;
+  backgroundColor: string;
+  foregroundColor: string;
+} | null;
+
 export type FriendView = {
   userId: string;
   username: string;
-	deviceId: string | null;
-	dhPubKey: string | null;
+  deviceId: string | null;
+  dhPubKey: string | null;
+  avatarSettings: AvatarSettings;
   createdAt: number;
 };
 
@@ -172,8 +179,9 @@ export async function listFriends(userId: string): Promise<FriendView[]> {
   const result = await sql<{
     friend_user_id: string;
     username: string;
-		device_id: string | null;
-		dh_pub_key: string | null;
+    device_id: string | null;
+    dh_pub_key: string | null;
+    avatar_settings: AvatarSettings;
     created_at: Date;
   }>`
     SELECT
@@ -181,6 +189,7 @@ export async function listFriends(userId: string): Promise<FriendView[]> {
       u.username,
       d.id AS device_id,
       d.dh_pub_key,
+      u.avatar_settings,
       f.created_at
     FROM friendships f
     JOIN users u
@@ -199,8 +208,9 @@ export async function listFriends(userId: string): Promise<FriendView[]> {
   return result.rows.map((r) => ({
     userId: r.friend_user_id,
     username: r.username,
-		deviceId: r.device_id,
-		dhPubKey: r.dh_pub_key,
+    deviceId: r.device_id,
+    dhPubKey: r.dh_pub_key,
+    avatarSettings: r.avatar_settings,
     createdAt: r.created_at.getTime(),
   }));
 }

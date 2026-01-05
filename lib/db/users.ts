@@ -1,8 +1,22 @@
 import { sql } from "@vercel/postgres";
 
+export type AvatarPattern =
+  | "letter"
+  | "letterBold"
+  | "letterMonospace"
+  | "pixelLetter"
+  | "ascii";
+
+export type AvatarSettings = {
+  pattern: AvatarPattern;
+  backgroundColor: string;
+  foregroundColor: string;
+};
+
 export type DbUser = {
   id: string;
   username: string;
+  avatar_settings: AvatarSettings | null;
   created_at: Date;
 };
 
@@ -17,7 +31,7 @@ export type DbUserDevice = {
 
 export async function getUserById(userId: string): Promise<DbUser | null> {
   const result = await sql<DbUser>`
-    SELECT id, username, created_at
+    SELECT id, username, avatar_settings, created_at
     FROM users
     WHERE id = ${userId}
   `;
@@ -28,7 +42,7 @@ export async function getUserByUsername(
   username: string
 ): Promise<DbUser | null> {
   const result = await sql<DbUser>`
-    SELECT id, username, created_at
+    SELECT id, username, avatar_settings, created_at
     FROM users
     WHERE username = ${username}
   `;
@@ -84,3 +98,19 @@ export async function listUserDevices(userId: string): Promise<DbUserDevice[]> {
   return result.rows;
 }
 
+export async function updateUserAvatarSettings(params: {
+  userId: string;
+  avatarSettings: AvatarSettings;
+}): Promise<DbUser> {
+  const result = await sql<DbUser>`
+    UPDATE users
+    SET avatar_settings = ${JSON.stringify(params.avatarSettings)}::jsonb
+    WHERE id = ${params.userId}
+    RETURNING id, username, avatar_settings, created_at
+  `;
+  const row = result.rows[0];
+  if (!row) {
+    throw new Error("User not found");
+  }
+  return row;
+}

@@ -5,6 +5,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
+      avatar_settings JSONB,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `;
@@ -251,5 +252,14 @@ export async function initializeDatabase() {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_timestamp
     ON chat_messages(thread_id, timestamp_ms DESC)
+  `;
+
+  await applyMigrations();
+}
+
+async function applyMigrations() {
+  await sql`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS avatar_settings JSONB
   `;
 }
