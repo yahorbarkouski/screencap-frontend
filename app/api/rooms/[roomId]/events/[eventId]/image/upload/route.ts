@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { SignedRequestError, verifySignedRequest } from "@/lib/auth/verify";
 import { enforceRateLimit, RateLimitError } from "@/lib/auth/rateLimit";
@@ -9,8 +9,40 @@ type RouteParams = {
   params: Promise<{ roomId: string; eventId: string }>;
 };
 
-export async function POST(request: Request, context: RouteParams) {
+export async function POST(request: NextRequest, context: RouteParams) {
   const { roomId, eventId } = await context.params;
+
+  let identity;
+  try {
+    identity = await verifySignedRequest(request);
+  } catch (error) {
+    if (error instanceof SignedRequestError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: "Auth failed" }, { status: 500 });
+  }
+
+  try {
+    await enforceRateLimit({
+      key: `roomimage:user:${identity.userId}`,
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } }
+      );
+    }
+    return NextResponse.json({ error: "Rate limit check failed" }, { status: 500 });
+  }
+
+  const role = await getRoomRole({ roomId, userId: identity.userId });
+  if (!role) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = (await request.json()) as HandleUploadBody;
 
   try {
@@ -18,34 +50,6 @@ export async function POST(request: Request, context: RouteParams) {
       body,
       request,
       onBeforeGenerateToken: async () => {
-        let identity;
-        try {
-          identity = await verifySignedRequest(request as never);
-        } catch (error) {
-          if (error instanceof SignedRequestError) {
-            throw new Error(error.message);
-          }
-          throw new Error("Auth failed");
-        }
-
-        try {
-          await enforceRateLimit({
-            key: `roomimage:user:${identity.userId}`,
-            limit: 60,
-            windowMs: 60 * 1000,
-          });
-        } catch (error) {
-          if (error instanceof RateLimitError) {
-            throw new Error("Rate limit exceeded");
-          }
-          throw new Error("Rate limit check failed");
-        }
-
-        const role = await getRoomRole({ roomId, userId: identity.userId });
-        if (!role) {
-          throw new Error("Forbidden");
-        }
-
         return {
           allowedContentTypes: ["application/octet-stream"],
           maximumSizeInBytes: 50 * 1024 * 1024,
