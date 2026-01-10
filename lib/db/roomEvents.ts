@@ -102,3 +102,18 @@ function mapRoomEvent(row: DbRoomEvent): RoomEventView {
   };
 }
 
+export async function deleteRoomEvent(params: {
+  eventId: string;
+  roomId: string;
+  authorUserId: string;
+}): Promise<DbRoomEvent | null> {
+  const result = await sql<DbRoomEvent>`
+    DELETE FROM room_events
+    WHERE id = ${params.eventId}
+      AND room_id = ${params.roomId}
+      AND author_user_id = ${params.authorUserId}
+    RETURNING id, room_id, author_user_id, timestamp_ms, payload_ciphertext, image_ref, created_at
+  `;
+  return result.rows[0] ?? null;
+}
+
