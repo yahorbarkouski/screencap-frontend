@@ -108,7 +108,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8 }}
-              className="-mb-4 sm:-mb-6 md:-mb-10 md:-ml-44 -ml-20"
+              className="-mb-4 sm:-mb-6 md:-mb-10 md:-ml-52 -ml-20"
             >
               <AsciiLogo />
             </motion.div>
