@@ -4,8 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ParticleBackground } from "@/components/particle-background";
-import { AsciiLogo } from "@/components/ascii-logo";
-import { AppleIcon, GithubIcon } from "lucide-react";
+import { DaylineHero } from "@/components/dayline-hero";
+import { GithubIcon } from "lucide-react";
 
 const enterInitial = {
   opacity: 0,
@@ -108,9 +108,9 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8 }}
-              className="-mb-4 sm:-mb-6 md:-mb-10 md:-ml-52 -ml-20"
+              className="mb-8 md:mb-12 w-full"
             >
-              <AsciiLogo />
+              <DaylineHero />
             </motion.div>
 
             <motion.p
