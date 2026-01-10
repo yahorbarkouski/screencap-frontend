@@ -28,13 +28,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Screencap — To understand where your day went",
+  title: "Screencap — to understand where your day went",
   description:
-    "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking. Local-first with E2E encrypted social features.",
+    "A macOS desktop app that captures screenshots, windows and apps (both background and foreground) on a schedule and transforms them into a timeline, daily summaries, project milestones, addiction tracking, with optional E2E-encrypted social feed. ",
   openGraph: {
     title: "Screencap — To understand where your day went",
     description:
-      "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking.",
+      "A macOS desktop app that captures screenshots, windows and apps (both background and foreground) on a schedule and transforms them into a timeline, daily summaries, project milestones, addiction tracking, with optional E2E-encrypted social feed. ",
     type: "website",
     url: "https://screencaping.com",
   },
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Screencap — To understand where your day went",
     description:
-      "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking.",
+      "A macOS desktop app that captures screenshots, windows and apps (both background and foreground) on a schedule and transforms them into a timeline, daily summaries, project milestones, addiction tracking, with optional E2E-encrypted social feed. ",
   },
 };
 
