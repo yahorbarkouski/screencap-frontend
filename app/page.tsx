@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ParticleBackground } from "@/components/particle-background";
+import { AsciiLogo } from "@/components/ascii-logo";
+import { AppleIcon, GithubIcon } from "lucide-react";
 
 const enterInitial = {
   opacity: 0,
@@ -22,9 +25,63 @@ const enterTransition = (delay: number) => ({
   delay,
 });
 
+type ReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type ReleaseResponse = {
+  assets: ReleaseAsset[];
+};
+
+async function downloadLatest() {
+  const isAppleSilicon = (() => {
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl");
+      const debugInfo = gl?.getExtension("WEBGL_debug_renderer_info");
+      if (debugInfo) {
+        const renderer = gl?.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        if (renderer?.includes("Apple M")) return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  })();
+
+  const arch = isAppleSilicon ? "arm64" : "x64";
+
+  const res = await fetch(
+    "https://api.github.com/repos/yahorbarkouski/screencap/releases/latest"
+  );
+  const data: ReleaseResponse = await res.json();
+
+  const dmg = data.assets.find(
+    (a) => a.name.endsWith(".dmg") && a.name.includes(arch)
+  );
+
+  if (dmg) {
+    window.location.href = dmg.browser_download_url;
+  } else {
+    window.location.href =
+      "https://github.com/yahorbarkouski/screencap/releases/latest";
+  }
+}
+
 export default function Home() {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadLatest();
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
-    <div className="relative min-h-screen min-h-dvh bg-background">
+    <div className="relative min-h-dvh bg-background">
       <ParticleBackground />
 
       <div className="fixed inset-0 h-dvh w-full bg-black/45" />
@@ -43,67 +100,53 @@ export default function Home() {
         </svg>
       </div>
 
-      <div className="relative z-10 p-2 sm:p-4 lg:p-6">
-        <motion.header
-          className="flex items-center gap-10 px-4 py-6 sm:px-8 sm:py-8 lg:px-32"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-        >
-          <motion.div 
-            className="text-xl text-white cursor-default"
-            whileHover={{ 
-              textShadow: "0 0 10px rgba(212, 168, 75, 0.8), 0 0 20px rgba(212, 168, 75, 0.5)" 
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            Screencap
-          </motion.div>
-        </motion.header>
+      <div className="relative z-10 flex min-h-dvh flex-col">
 
-        <main className="px-4 py-6 sm:p-8 lg:p-12 lg:px-32">
-          <div className="max-w-3xl">
-            <motion.h1
-              className="mb-8 text-[1.75rem] leading-[1.15] tracking-tight text-gray-200 sm:mb-12 sm:text-[2.25rem] md:mb-16 md:text-5xl"
+        <main className="flex flex-1 flex-col items-center px-4 pb-8 sm:pb-16">
+          <div className="w-full max-w-4xl text-center pt-16 sm:pt-24 md:pt-32">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="-mb-4 sm:-mb-6 md:-mb-10 md:-ml-44 -ml-20"
+            >
+              <AsciiLogo />
+            </motion.div>
+
+            <motion.p
+              className="mx-auto mb-8 max-w-[600px] px-2 text-[14px] leading-[1.7] text-gray-200 sm:mb-12 sm:px-0 sm:text-[15px] md:mb-14 md:text-[16px]"
               initial={enterInitial}
               animate={enterAnimate}
-              transition={enterTransition(0)}
+              transition={enterTransition(0.3)}
             >
-              Share your project progress with the world.
-            </motion.h1>
-
-            <div className="space-y-6 text-[15px] leading-[1.7] text-zinc-300 sm:space-y-8 sm:text-[17px]">
-              <motion.p
-                initial={enterInitial}
-                animate={enterAnimate}
-                transition={enterTransition(0.15)}
-              >
-                Screencap captures your development milestones and lets you share them publicly.
-                Each project gets a unique link where your progress is streamed in real-time.
-              </motion.p>
-
-              <motion.p
-                initial={enterInitial}
-                animate={enterAnimate}
-                transition={enterTransition(0.3)}
-              >
-                No accounts needed. Just enable sharing in the desktop app and your
-                progress updates will appear on your public page automatically.
-              </motion.p>
-            </div>
+              Capture screenshots with context on schedule, classify with LLM, and
+              transform them into timelines, daily summaries, project
+              milestones, and addiction tracking, then share with friends
+            </motion.p>
 
             <motion.div
-              className="mt-12 sm:mt-16 lg:mt-20"
+              className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4"
               initial={enterInitial}
               animate={enterAnimate}
-              transition={enterTransition(0.45)}
+              transition={enterTransition(0.4)}
             >
-              <Link
-                href="https://screencap.app"
-                className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-6 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/20 hover:border-gold/50"
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-6 py-3 text-sm font-medium text-gold transition-colors hover:cursor-pointer hover:border-gold/50 hover:bg-gold/20 disabled:opacity-50 sm:w-auto"
               >
-                Download Screencap
-                <span className="text-gold/70">→</span>
+                {downloading ? "Downloading..." : "Download"}
+                <span className="text-gold/70">↓</span>
+              </button>
+              <Link
+                href="https://github.com/yahorbarkouski/screencap"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-zinc-700 px-6 py-3 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white sm:w-auto"
+              >
+                <GithubIcon className="h-4 w-4" />
+                GitHub
+                <span className="ml-1 text-zinc-400">→</span>
               </Link>
             </motion.div>
           </div>

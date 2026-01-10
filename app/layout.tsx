@@ -28,8 +28,22 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Screencap",
-  description: "Project progress sharing",
+  title: "Screencap — To understand where your day went",
+  description:
+    "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking. Local-first with E2E encrypted social features.",
+  openGraph: {
+    title: "Screencap — To understand where your day went",
+    description:
+      "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking.",
+    type: "website",
+    url: "https://screencaping.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Screencap — To understand where your day went",
+    description:
+      "A macOS app that captures screenshots, classifies them with AI, and transforms them into timelines, daily summaries, project milestones, and addiction tracking.",
+  },
 };
 
 export default function RootLayout({
